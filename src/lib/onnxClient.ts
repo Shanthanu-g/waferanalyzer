@@ -15,7 +15,7 @@ import {
 // WM-811K canonical 9-class label set — ORDER MUST match LABEL_MAP from training:
 // CLASSES = ["none","Edge-Ring","Edge-Loc","Center","Loc","Scratch","Random","Donut","Near-full"]
 // Index 0=none, 1=Edge-Ring, 2=Edge-Loc, 3=Center, 4=Loc, 5=Scratch, 6=Random, 7=Donut, 8=Near-full
-export const WAFER_CLASSES = [
+const WAFER_CLASSES = [
   "none",
   "Edge-Ring",
   "Edge-Loc",
@@ -37,7 +37,7 @@ ort.env.wasm.numThreads = 1;
 
 let sessionPromise: Promise<ort.InferenceSession> | null = null;
 
-export function getSession(): Promise<ort.InferenceSession> {
+function getSession(): Promise<ort.InferenceSession> {
   if (!sessionPromise) {
     sessionPromise = ort.InferenceSession.create(MODEL_URL, {
       executionProviders: ["wasm"],
@@ -74,23 +74,16 @@ export async function runOnnxDetection(map: WaferMap): Promise<DetectionResult> 
   const start = performance.now();
   const session = await getSession();
 
-  // Build [1, 1, 64, 64] float32 tensor matching training normalization:
-  //   outside wafer circle → 0.0  (waferMap value 0, divided by 2)
-  //   normal die (no defect) → 0.5  (waferMap value 1, divided by 2)
-  //   defective die → 1.0  (waferMap value 2, divided by 2)
-  // The canvas WaferMap uses 0=clear, 1=defect inside the circle mask.
-  // Tiles outside the circle are never painted so they stay 0 — correct.
-  // Tiles inside the circle that are clear should be 0.5, not 0.0.
+  // Model input is always [1, 1, 64, 64] — display size is independent.
+  // Normalize: outside circle → 0.0, clear die → 0.5, defective die → 1.0.
   const input = new Float32Array(GRID_SIZE * GRID_SIZE);
   for (let y = 0; y < GRID_SIZE; y++) {
     for (let x = 0; x < GRID_SIZE; x++) {
       const i = y * GRID_SIZE + x;
       if (map[i] === 1) {
-        input[i] = 1.0; // defect die
+        input[i] = 1.0;
       } else if (isInside(x, y)) {
-        input[i] = 0.5; // normal die (inside wafer, not defective)
-      } else {
-        input[i] = 0.0; // outside wafer
+        input[i] = 0.5;
       }
     }
   }

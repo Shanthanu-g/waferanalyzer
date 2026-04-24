@@ -1,11 +1,9 @@
 // ML client — picks the best available inference backend:
 //   1. In-browser ONNX model (cnn_wafer.onnx) — preferred
 //   2. Configurable HTTP endpoint (advanced users)
-//   3. Local heuristic detector (offline fallback)
 
 import {
   GRID_SIZE,
-  detectClusters,
   type DetectedCluster,
   type DetectionResult,
   type WaferMap,
@@ -182,14 +180,5 @@ export async function runDetection(map: WaferMap): Promise<{
   if (backend === "remote" && getEndpoint()) {
     return { result: await runRemoteDetection(map), source: "remote" };
   }
-  if (backend === "local") {
-    return { result: detectClusters(map), source: "local" };
-  }
-  // Default: in-browser ONNX. Fall through to local heuristic on failure.
-  try {
-    return { result: await runOnnxDetection(map), source: "onnx" };
-  } catch (err) {
-    console.warn("ONNX inference failed, falling back to heuristic:", err);
-    return { result: detectClusters(map), source: "local" };
-  }
+  return { result: await runOnnxDetection(map), source: "onnx" };
 }
